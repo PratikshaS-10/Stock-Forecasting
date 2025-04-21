@@ -11,10 +11,7 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Dropout
 
-# Load the dataset
 dataset = pd.read_csv("AAPL_historical_data.csv")
-
-# Convert 'Date' to datetime
 dataset['Date'] = pd.to_datetime(dataset['Date'], errors='coerce', utc=True)
 
 # Check for missing and duplicate values
@@ -25,7 +22,7 @@ print(dataset.duplicated().sum())
 sns.lineplot(x=dataset['Date'], y=dataset['Close'])
 plt.ylabel('Closing Price')
 plt.title('AAPL Stock Price from 1980-2025')
-plt.show() 
+plt.show()
 
 # Check for stationarity
 def check_stationary(timeseries):
@@ -44,17 +41,16 @@ check_stationary(dataset['Close'])
 # Differencing to make the series stationary
 dataset['diff'] = dataset['Close'].diff()
 dataset.dropna(inplace=True)
-
 check_stationary(dataset['diff'])
 
-
-# Remove outliers from the original 'Close' prices
+# Remove outliers 
 Q1 = dataset['diff'].quantile(0.25)
 Q3 = dataset['diff'].quantile(0.75)
 IQR = Q3 - Q1
 lower_bound = Q1 - 1.5 * IQR
 upper_bound = Q3 + 1.5 * IQR
 df_cleaned = dataset[(dataset['diff'] >= lower_bound) & (dataset['diff'] <= upper_bound)]
+print(dataset.head())
 
 
 best_aic = np.inf
@@ -62,11 +58,11 @@ best_order = None
 
 # Grid search over p, d, q values
 for d in range(0,2):
-    for p in range(0,4):
-        for q in range(0,4):
+    for p in range(0,3):
+        for q in range(0,3):
             try:
                 # Fit ARIMA model
-                model = ARIMA(stat_daily_sales, order=(p, d, q))
+                model = ARIMA(df_cleaned['diff'], order=(p, d, q))
                 model_fit = model.fit()
                 # Get AIC
                 aic = model_fit.aic
@@ -79,35 +75,35 @@ for d in range(0,2):
 
 print(f'Best ARIMA order: {best_order} with AIC: {best_aic}')
 
-# Fit the ARIMA model
-model = ARIMA(df_cleaned['Close'], order=(2, 1, 2))  # Use the cleaned data
+#Fit the ARIMA model
+model = ARIMA(df_cleaned['Close'], order=(1, 1, 2))  # Use the cleaned data
 model_fit = model.fit()
 print(model_fit.summary())
 fitted_values=model_fit.fittedvalues
 
 
-forecast = model_fit.forecast(steps=3650)
-print(forecast.head())  # Print the first few forecasted values
+forecast1 = model_fit.forecast(steps=252)
+print(forecast1.head())  # Print the first few forecasted values
 
 # Create a date range for the forecasted values
 last_date = df_cleaned['Date'].iloc[-1]  # Get the last date from the cleaned data
-forecast_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=3650, freq='B')  # Business days
+forecast_dates = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=252, freq='B')  # Business days
 
 # Create a DataFrame for the forecasted data
-forecast_df = pd.DataFrame({'Date': forecast_dates, 'Forecasted Values': forecast})
+forecast_df = pd.DataFrame({'Date': forecast_dates, 'Forecasted Values': forecast1})
 
 # Plot the original data, fitted values, and forecast
 # plt.figure(figsize=(12, 6))
 plt.plot(df_cleaned['Date'], df_cleaned['Close'], label='Original Data', color='blue')
 plt.plot(df_cleaned['Date'], model_fit.fittedvalues, label='Fitted Values', color='orange')
-plt.title('AAPL Stock Price original v/s fitted values')
+plt.title('AAPL Stock Price original v/s fitted values-ARIMA')
 plt.xlabel('Date')
 plt.ylabel('Price')
 plt.legend()
 plt.show()
 
 #forecasted values
-plt.plot(forecast_dates,forecast,label='Forecasted Values',color='green')
+plt.plot(forecast_dates,forecast1,label='Forecasted Values',color='green')
 plt.title('AAPL Stock Price Forecast')
 plt.xlabel('Date')
 plt.ylabel('Price')
@@ -116,14 +112,15 @@ plt.show()
 
 # Residuals
 residuals = model_fit.resid
-sns.scatterplot(x=residuals.index, y=residuals)
+print(residuals)
+sns.scatterplot(x=df_cleaned['Date'], y=residuals)
 plt.title('Residuals of the ARIMA Model')
-plt.xlabel('Index')
+plt.xlabel('Dates')
 plt.ylabel('Residuals')
 plt.show()
 check_stationary(residuals)
 
-
+#EXPONENTIAL SMOOTHING
 hw_model = ExponentialSmoothing(df_cleaned['Close'], trend='add', seasonal='add', seasonal_periods=252)
 hw_fit = hw_model.fit()
 fitted_values_exp = hw_fit.fittedvalues
@@ -132,90 +129,81 @@ fitted_values_exp = hw_fit.fittedvalues
 plt.figure(figsize=(12, 6))
 plt.plot(df_cleaned['Date'], df_cleaned['Close'], label='Original Data', color='blue')
 plt.plot(df_cleaned['Date'], fitted_values_exp, label='Fitted Values', color='orange')
-plt.title('AAPL Stock Price: Original vs Fitted vs Forecasted Values')
+plt.title('Original vs Fitted-Exponential Smoothing ')
 plt.xlabel('Date')
 plt.ylabel('Price')
 plt.legend()
 plt.show()
 
 #forecasted values
-hw_forecast = hw_fit.forecast(steps=3650)
+hw_forecast = hw_fit.forecast(steps=252)
 
 # Dates for forecast
 last_date = df_cleaned['Date'].iloc[-1]  # Get the last date from the cleaned data
-forecast_dates_hw = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=3650, freq='B')
+forecast_dates_hw = pd.date_range(start=last_date + pd.Timedelta(days=1), periods=252, freq='B')
 plt.plot(forecast_dates_hw,hw_forecast,label='Forecasted Values',color='green')
-plt.title('AAPL Stock Price Forecast')
+plt.title('Forecast-EXPONENTIAL SMOOTHING ')
 plt.xlabel('Date')
 plt.ylabel('Price')
 plt.show()
 
 residuals2 = hw_fit.resid
-sns.scatterplot(x=residuals2.index, y=residuals2)
-plt.title('Residuals of the Exponentiall Smoothing')
-plt.xlabel('Index')
+sns.scatterplot(x=df_cleaned['Date'],y=residuals2)
+plt.title('Residuals of the Exponential Smoothing')
+plt.xlabel('Date')
 plt.ylabel('Residuals')
 plt.show()
 check_stationary(residuals)
-#arims v*/s exp--check
-plt.plot(forecast_dates, forecast, label='ARIMA Forecast', color='green')
-plt.plot(forecast_dates_hw, hw_forecast, label='Holt-Winters Forecast', color='purple')
-plt.title('ARIMA vs Holt-Winters Forecast (Next 14 Years)')
-plt.xlabel('Date')
-plt.ylabel('Price')
-plt.legend()
-plt.show() 
-
-
-mse_arima = mean_squared_error(df_cleaned['Close'], fitted_values)
-print(f'Mean Squared Error for ARIMA: {mse_arima:.4f}')
-
-mse_hw = mean_squared_error(df_cleaned['Close'], fitted_values_exp)
-print(f'Mean Squared Error for Holt-Winters: {mse_hw:.4f}')
 
 #Prophet
 prophet_data = df_cleaned[['Date', 'Close']].copy()
 prophet_data['Date'] = prophet_data['Date'].dt.tz_localize(None)
-prophet_data = prophet_data.rename(columns={'Date': 'ds', 'Close': 'y'})
 
-prophet_model = Prophet(daily_seasonality=False, yearly_seasonality=True)
+prophet_data = prophet_data.rename(columns={'Date': 'ds', 'Close': 'y'})
+prophet_model = Prophet()
 prophet_model.fit(prophet_data)
 
-# Forecast 3650 business days
-future = prophet_model.make_future_dataframe(periods=3650)
-forecast = prophet_model.predict(future)
-last_date = prophet_data['ds'].max().replace(tzinfo=None)
 
-# Filter forecasted values that are after the last date in the original dataset
-future_forecast = forecast[forecast['ds'] > last_date]
+# Forecast 252 business days
+future = prophet_model.make_future_dataframe(periods=252)
+forecast2 = prophet_model.predict(future)
+last_date = prophet_data['ds'].max()
 
-
-fitted = forecast['yhat'].iloc[:len(prophet_data)]
-
+future_forecast = forecast2[forecast2['ds'] > last_date]
+fitted = forecast2['yhat'].iloc[:len(prophet_data)]
 plt.figure(figsize=(12, 6))
 plt.plot(prophet_data['ds'], prophet_data['y'], label='Actual', color='black')
 plt.plot(prophet_data['ds'], fitted, label='Fitted (Prophet)', color='blue')
-plt.plot(future_forecast['ds'], future_forecast['yhat'], label='Forecast (Prophet)', color='red')
 plt.title('Prophet Forecast with Actuals')
 plt.xlabel('Date')
 plt.ylabel('Price')
 plt.legend()
 plt.show()
 
-# MSE on fitted values
+plt.plot(future_forecast['ds'], future_forecast['yhat'], label='Forecast (Prophet)', color='red')
+plt.xlabel('Date')
+plt.ylabel('Price')
+plt.legend()
+plt.show()
 
-mse_prophet = mean_squared_error(df_cleaned['Close'], fitted)
-print(f'MSE for Prophet: {mse_prophet:.4f}')
 
+#resuiduals
+prophet_data['residuals'] = prophet_data['y'] - fitted.values
+plt.figure(figsize=(12, 4))
+plt.scatter(prophet_data['ds'], prophet_data['residuals'], color='purple', alpha=0.6)
+plt.axhline(0, color='red', linestyle='--')
+plt.title('Residuals Scatter Plot (Prophet)')
+plt.xlabel('Date')
+plt.ylabel('Residual')
+plt.grid(True)
+plt.show()
+
+#LSTM
 data = dataset[['Date', 'Close']].dropna()
-
-# Sort data by date
 data = data.sort_values(by='Date')
-
 # Use only 'Close' price for forecasting
 prices = data[['Close']].values
 
-# Normalize the data (scale to range [0,1])
 scaler = MinMaxScaler(feature_range=(0, 1))
 scaled_prices = scaler.fit_transform(prices)
 
@@ -265,12 +253,12 @@ plt.ylabel('Price')
 plt.legend()
 plt.show()
 
-# Forecasting the next 30 days
+# Forecasting the next 10 YEARS
 # Use the last `sequence_length` data points for prediction
 last_data = scaled_prices[-sequence_length:]
 
-# Predict the next 'n' days (e.g., next 30 days)
-n_days = 30
+# Predict the next 'n' days (e.g., next 252 days)
+n_days = 252
 predictions = []
 
 for _ in range(n_days):
@@ -292,11 +280,31 @@ forecast_dates = pd.date_range(start=data['Date'].iloc[-1] + pd.Timedelta(days=1
 
 # Plot the forecasted values
 plt.figure(figsize=(12, 6))
-plt.plot(data['Date'], data['Close'], label='Actual Price', color='black')
+#plt.plot(data['Date'], data['Close'], label='Actual Price', color='black')
 plt.plot(forecast_dates, predictions, label='LSTM Forecasted Price', color='blue')
 plt.title(f'LSTM Forecast for {n_days} Days')
 plt.xlabel('Date')
 plt.ylabel('Price')
 plt.legend()
 plt.show()
+
+residuals4 = actual_prices.flatten() - predicted_prices.flatten()
+plt.figure(figsize=(12, 4))
+sns.scatterplot(x=data['Date'].iloc[sequence_length:], y=residuals4, color='purple', alpha=0.6)
+plt.axhline(0, color='red', linestyle='--')
+plt.title('LSTM Residuals (Actual - Predicted)')
+plt.xlabel('Date')
+plt.ylabel('Residual')
+plt.grid(True)
+plt.show()
+
+mse_arima = mean_squared_error(df_cleaned['Close'], model_fit.fittedvalues)
+mse_hw = mean_squared_error(df_cleaned['Close'], hw_fit.fittedvalues)
+mse_prophet = mean_squared_error(df_cleaned['Close'], fitted)
+mse_lstm = mean_squared_error(data['Close'].iloc[sequence_length:], predicted_prices.flatten())
+
+print(f"ARIMA MSE: {mse_arima:.2f}")
+print(f"Holt-Winters MSE: {mse_hw:.2f}")
+print(f"Prophet MSE: {mse_prophet:.2f}")
+print(f"LSTM MSE: {mse_lstm:.2f}")
 
