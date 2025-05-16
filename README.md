@@ -1,6 +1,6 @@
 # 📈 AAPL Stock Price Forecasting (1980–2025)
 
-This project performs in-depth **time series forecasting** using **ARIMA**, **Exponential Smoothing**, **Facebook Prophet**, and **LSTM Neural Networks** on **AAPL (Apple Inc.)** historical stock data. The goal is to explore trends, check stationarity, model the data, and forecast future stock prices up to 10 years.
+This project performs in-depth **time series forecasting** using **ARIMA**, **Exponential Smoothing** and **Facebook Prophet**, on **AAPL (Apple Inc.)** historical stock data. The goal is to explore trends, check stationarity, model the data, and forecast future stock prices for next trade year.
 
 ---
 
@@ -13,7 +13,6 @@ This project performs in-depth **time series forecasting** using **ARIMA**, **Ex
   - ARIMA
   - Holt-Winters Exponential Smoothing
   - Prophet (Facebook)
-  - LSTM (Deep Learning)
 - 🧠 Residual Analysis for each model
 - 📉 Model Evaluation via Mean Squared Error (MSE)
 
@@ -57,11 +56,6 @@ python forecast_aapl_stock.py
 - Automatically detects trends, holidays, and seasonality.
 - Easily visualizes component trends and residuals.
 
-### ✅ LSTM (Deep Learning)
-- Long Short-Term Memory neural network built with TensorFlow/Keras.
-- Trains on scaled `Close` price with sequence data.
-- Forecasts next 252 days (can extend to multiple years).
-
 ---
 
 ## 📈 Evaluation
@@ -73,7 +67,6 @@ Mean Squared Error (MSE) and Root Mean Squared Error(RMSE) is calculated for eac
 ARIMA :        0.68        0.82
 Holt-Winters : 0.66        0.81
 Prophet :      33.50       5.79
-LSTM :         5.40        2.33
 
 ```
 
