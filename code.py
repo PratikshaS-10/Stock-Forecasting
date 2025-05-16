@@ -7,9 +7,6 @@ from statsmodels.tsa.arima.model import ARIMA
 from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from sklearn.metrics import mean_squared_error
 from prophet import Prophet
-from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
 
 dataset = pd.read_csv("AAPL_historical_data.csv")
 dataset['Date'] = pd.to_datetime(dataset['Date'], errors='coerce', utc=True)
@@ -198,113 +195,12 @@ plt.ylabel('Residual')
 plt.grid(True)
 plt.show()
 
-#LSTM
-data = dataset[['Date', 'Close']].dropna()
-data = data.sort_values(by='Date')
-# Use only 'Close' price for forecasting
-prices = data[['Close']].values
-
-scaler = MinMaxScaler(feature_range=(0, 1))
-scaled_prices = scaler.fit_transform(prices)
-
-# Create sequences of the stock price (LSTM expects sequences of data)
-def create_sequences(data, seq_length):
-    X, y = [], []
-    for i in range(seq_length, len(data)):
-        X.append(data[i-seq_length:i, 0])  # Create sequence
-        y.append(data[i, 0])  # Actual price
-    return np.array(X), np.array(y)
-
-# Set sequence length (e.g., 60 days to predict next day's price)
-sequence_length = 60
-X, y = create_sequences(scaled_prices, sequence_length)
-
-# Reshape X to be compatible with LSTM (samples, timesteps, features)
-X = np.reshape(X, (X.shape[0], X.shape[1], 1))
-
-# Define the LSTM model
-model = Sequential()
-model.add(LSTM(units=50, return_sequences=True, input_shape=(X.shape[1], 1)))
-model.add(Dropout(0.2))  # Dropout to avoid overfitting
-model.add(LSTM(units=50, return_sequences=False))
-model.add(Dropout(0.2))
-model.add(Dense(units=1))  # Output layer
-
-# Compile the model
-model.compile(optimizer='adam', loss='mean_squared_error')
-
-# Train the model (fit to data)
-history = model.fit(X, y, epochs=20, batch_size=32, verbose=1)
-
-# Predict stock prices on the training set
-predicted_prices = model.predict(X)
-
-# Inverse the scaling to get original values
-predicted_prices = scaler.inverse_transform(predicted_prices)
-actual_prices = scaler.inverse_transform(y.reshape(-1, 1))
-
-# Plot the actual vs predicted prices
-plt.figure(figsize=(12, 6))
-plt.plot(data['Date'].iloc[sequence_length:], actual_prices, label='Actual Price', color='black')
-plt.plot(data['Date'].iloc[sequence_length:], predicted_prices, label='LSTM Predicted Price', color='blue')
-plt.title('LSTM: Actual vs Predicted Stock Price')
-plt.xlabel('Date')
-plt.ylabel('Price')
-plt.legend()
-plt.show()
-
-# Forecasting the next 10 YEARS
-# Use the last `sequence_length` data points for prediction
-last_data = scaled_prices[-sequence_length:]
-
-# Predict the next 'n' days (e.g., next 252 days)
-n_days = 252
-predictions = []
-
-for _ in range(n_days):
-    # Reshape for prediction
-    last_data_reshaped = np.reshape(last_data, (1, sequence_length, 1))
-
-    # Predict next price
-    next_price = model.predict(last_data_reshaped)
-
-    # Inverse transform to get actual price
-    next_price = scaler.inverse_transform(next_price)
-    predictions.append(next_price[0][0])
-
-    # Update `last_data` with the predicted price
-    last_data = np.append(last_data[1:], next_price)
-
-# Create a date range for the forecasted data
-forecast_dates = pd.date_range(start=data['Date'].iloc[-1] + pd.Timedelta(days=1), periods=n_days)
-
-# Plot the forecasted values
-plt.figure(figsize=(12, 6))
-#plt.plot(data['Date'], data['Close'], label='Actual Price', color='black')
-plt.plot(forecast_dates, predictions, label='LSTM Forecasted Price', color='blue')
-plt.title(f'LSTM Forecast for {n_days} Days')
-plt.xlabel('Date')
-plt.ylabel('Price')
-plt.legend()
-plt.show()
-
-residuals4 = actual_prices.flatten() - predicted_prices.flatten()
-plt.figure(figsize=(12, 4))
-sns.scatterplot(x=data['Date'].iloc[sequence_length:], y=residuals4, color='purple', alpha=0.6)
-plt.axhline(0, color='red', linestyle='--')
-plt.title('LSTM Residuals (Actual - Predicted)')
-plt.xlabel('Date')
-plt.ylabel('Residual')
-plt.grid(True)
-plt.show()
 
 mse_arima = mean_squared_error(df_cleaned['Close'], model_fit.fittedvalues)
 mse_hw = mean_squared_error(df_cleaned['Close'], hw_fit.fittedvalues)
 mse_prophet = mean_squared_error(df_cleaned['Close'], fitted)
-mse_lstm = mean_squared_error(data['Close'].iloc[sequence_length:], predicted_prices.flatten())
 
 print(f"ARIMA MSE: {mse_arima:.2f}")
 print(f"Holt-Winters MSE: {mse_hw:.2f}")
 print(f"Prophet MSE: {mse_prophet:.2f}")
-print(f"LSTM MSE: {mse_lstm:.2f}")
 
